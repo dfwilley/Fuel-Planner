@@ -6,4 +6,6 @@ It compares buying avgas at KTUS with a round trip to a nearby airport. The numb
 
 Open [index.html](index.html) in a browser, or use the GitHub Pages site: https://dfwilley.github.io/Fuel-Planner/
 
+[wb.html](wb.html) is the N721NE weight and balance sheet (50.7 gal usable; aerobatic flight requires empty baggage).
+
 On iPhone, open that site in Safari and use Share → Add to Home Screen. The pilot in command checks weather, NOTAMs, and TFRs and makes the go/no-go call.
