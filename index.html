@@ -14,7 +14,9 @@
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.4 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;background:var(--bg);color:var(--fg);padding:env(safe-area-inset-top) 14px 40px}
 h1{font-size:22px;margin:16px 0 4px}
-.sub{color:var(--mut);font-size:13px;margin-bottom:14px}
+h2{font-size:15px;margin:16px 0 2px}
+.sub,.hint{color:var(--mut);font-size:13px;margin-bottom:14px}
+.hint{margin:0 0 8px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 label{display:block;font-size:13px;color:var(--mut)}
 input,select{width:100%;font-size:17px;padding:9px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--fg);margin-top:3px}
@@ -39,10 +41,10 @@ details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
 
 <div class="grid">
   <div><label>Fuel on board now (gal)<input id="start" type="number" inputmode="decimal" value="20"></label></div>
-  <div><label>Fuel wanted landing at KTUS (gal)<input id="end" type="number" inputmode="decimal" value="45"></label></div>
+  <div><label>Fuel wanted landing at KTUS (gal)<input id="end" type="number" inputmode="decimal" value="38"></label></div>
   <div><label>Cruise speed (KTAS)<input id="ktas" type="number" inputmode="decimal" value="200"></label></div>
   <div><label>Fuel burn (gal/hr)<input id="gph" type="number" inputmode="decimal" value="10.5"></label></div>
-  <div><label>Taxi/takeoff/climb per leg (gal)<input id="taxi" type="number" inputmode="decimal" value="1"></label></div>
+  <div><label>Maximum distance (NM)<input id="maxnm" type="number" inputmode="decimal" value="100"></label></div>
   <div><label>KTUS baseline<select id="ktus">
     <option value="8.30">Executive Air $8.30 FS</option>
     <option value="8.40">Tucson Jet Center $8.40 FS</option>
@@ -50,6 +52,19 @@ details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
     <option value="8.55">Million Air $8.55 FS</option>
   </select></label></div>
 </div>
+
+<h2>Planning assumptions</h2>
+<p class="hint">Climb, descent, and taxi fuel are planning assumptions, not a performance chart. Descent is flown at the cruise KTAS above.</p>
+<div class="grid">
+  <div><label>Cruise altitude (ft MSL)<input id="calt" type="number" inputmode="decimal" value="9000"></label></div>
+  <div><label>Taxi + takeoff fuel per leg (gal)<input id="taxi" type="number" inputmode="decimal" value="0.5"></label></div>
+  <div><label>Climb rate (fpm)<input id="clrate" type="number" inputmode="decimal" value="1000"></label></div>
+  <div><label>Climb speed (kt)<input id="clkt" type="number" inputmode="decimal" value="130"></label></div>
+  <div><label>Climb fuel flow (gal/hr)<input id="clgph" type="number" inputmode="decimal" value="14"></label></div>
+  <div><label>Descent rate (fpm)<input id="dsrate" type="number" inputmode="decimal" value="500"></label></div>
+  <div><label>Descent fuel flow (gal/hr)<input id="dsgph" type="number" inputmode="decimal" value="7"></label></div>
+</div>
+
 <label style="margin-top:10px">Reserve</label>
 <div class="seg" id="cond"><button data-v="day" class="on">Day VFR (30 min)</button><button data-v="night">Night VFR (45 min)</button></div>
 <label class="chk"><input type="checkbox" id="alt"> Use unconfirmed lower prices (Bisbee $5.33, Safford $6.34)</label>
@@ -58,41 +73,64 @@ details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
 <div id="list"></div>
 <details id="nodet"><summary>Not possible with these inputs</summary><div id="no"></div></details>
 
-<div class="foot">Fuel per leg = taxi allowance + NM ÷ KTAS × gal/hr. Reserve = 30 or 45 min at your fuel burn. Outbound is legal if fuel on board − leg fuel ≥ reserve. Gallons bought = ending fuel + 2 × leg fuel − fuel on board (tank max 50). Flight time = round-trip cruise + 10 min. Still air, no winds. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
+<div class="foot">Each leg is climb, then cruise, then descent, in still air. Climb time is (top of climb − departure elevation) ÷ climb rate, and climb distance is that time at climb speed. Descent time is (top of climb − arrival elevation) ÷ descent rate, flown at cruise KTAS. Cruise distance is the leg distance minus climb and descent distance, at cruise KTAS and the cruise fuel burn. If climb plus descent would be longer than the leg, the top of climb is lowered so those two segments exactly equal the distance and there is no cruise. Leg fuel = taxi/takeoff + climb fuel + cruise fuel + descent fuel. Outbound is KTUS to the airport and the return is the reverse, so the legs differ when the field elevations differ. Outbound is legal if fuel on board − outbound fuel ≥ reserve (30 or 45 min at the cruise fuel burn). Gallons bought = ending fuel + outbound fuel + return fuel − fuel on board (tank max 50). Flight time is both legs' climb, cruise, and descent, plus 3 min of taxi per leg. Airports farther than the maximum distance are left out. Field elevations are FAA airport data via aviationweather.gov (meters, converted to feet) or, where that feed has no record, the AirNav surveyed field elevation. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
 
 <script>
+// ident, name, NM from KTUS, field elev ft MSL, $/gal, SS/FS, price source, runway, optional note, optional unconfirmed price + source
 const A=[
-["KRYN","Ryan Field",11.9,7.45,"SS","AirNav live","5500 ft"],
-["KAVQ","Marana Regional",22.5,7.45,"SS","SkyVector 10/19","6901 ft"],
-["E95","Benson Muni",30.5,6.99,"FS","SkyVector 10/21","4002 ft","City self-serve $7.24"],
-["KMZJ","Pinal Airpark",30.6,7.00,"FS","GlobalAir 10/12","6849 ft"],
-["E77","San Manuel",34.6,6.85,"SS","SkyVector 10/22","4207 ft","24 hr self-serve"],
-["KOLS","Nogales Intl",42.3,7.95,"FS","AirNav live","7200 ft"],
-["KFHU","Sierra Vista Muni",44.0,7.12,"SS","AirNav 10/23","12001 ft"],
-["E60","Eloy Muni",52.8,6.95,"SS","AirNav 10/14","3901 ft","24 hr self-serve"],
-["P33","Cochise County (Willcox)",53.8,7.18,"FS","AirNav 10/20","6095 ft"],
-["P08","Coolidge Muni",55.0,6.59,"SS","AirNav live","5564 ft"],
-["KCGZ","Casa Grande Muni",65.4,7.05,"SS","AirNav live","5200 ft","24 hr self-serve"],
-["P04","Bisbee Muni",70.3,7.00,"SS","SkyVector 10/6","5929 ft","Assisted self-serve, 24 hr",5.33,"GlobalAir 10/15, unconfirmed"],
-["A39","Ak-Chin Regional",72.1,6.60,"SS","All sources 10/19","4751 ft","24 hr self-serve"],
-["KDUG","Bisbee Douglas Intl",78.6,7.48,"SS","AirNav 10/23","6430 ft"],
-["KSAD","Safford Regional",79.6,6.99,"SS","AirNav live","6007 ft","24 hr self-serve",6.34,"GlobalAir 10/14, unconfirmed"],
-["KIWA","Mesa Gateway",80.1,8.48,"FS","AirNav live","10401 ft"],
-["KCHD","Chandler Muni",81.9,6.70,"SS","AirNav live","4870 ft"],
-["P19","Stellar Airpark",86.4,6.90,"SS","AirNav live","4417 ft","24 hr self-serve"],
-["KDGL","Douglas Muni",86.8,6.60,"SS","SkyVector 10/22","5760 ft"],
-["KFFZ","Falcon Field",89.9,7.56,"SS","AirNav live","5100 ft"],
-["KPHX","Phoenix Sky Harbor",95.8,8.61,"FS","AirNav live","11489 ft"]
+["KRYN","Ryan Field",11.9,2418,7.45,"SS","AirNav live","5500 ft"],
+["KAVQ","Marana Regional",22.5,2031,7.45,"SS","SkyVector 10/19","6901 ft"],
+["E95","Benson Muni",30.5,3831,6.99,"FS","SkyVector 10/21","4002 ft","City self-serve $7.24"],
+["KMZJ","Pinal Airpark",30.6,1893,7.00,"FS","GlobalAir 10/12","6849 ft"],
+["E77","San Manuel",34.6,3272,6.85,"SS","SkyVector 10/22","4207 ft","24 hr self-serve"],
+["KOLS","Nogales Intl",42.3,3953,7.95,"FS","AirNav live","7200 ft"],
+["KFHU","Sierra Vista Muni",44.0,4718,7.12,"SS","AirNav 10/23","12001 ft"],
+["E60","Eloy Muni",52.8,1511,6.95,"SS","AirNav 10/14","3901 ft","24 hr self-serve"],
+["P33","Cochise County (Willcox)",53.8,4187,7.18,"FS","AirNav 10/20","6095 ft"],
+["P08","Coolidge Muni",55.0,1576,6.59,"SS","AirNav live","5564 ft"],
+["KCGZ","Casa Grande Muni",65.4,1463,7.05,"SS","AirNav live","5200 ft","24 hr self-serve"],
+["P04","Bisbee Muni",70.3,4790,7.00,"SS","SkyVector 10/6","5929 ft","Assisted self-serve, 24 hr",5.33,"GlobalAir 10/15, unconfirmed"],
+["A39","Ak-Chin Regional",72.1,1307,6.60,"SS","All sources 10/19","4751 ft","24 hr self-serve"],
+["KDUG","Bisbee Douglas Intl",78.6,4150,7.48,"SS","AirNav 10/23","6430 ft"],
+["KSAD","Safford Regional",79.6,3179,6.99,"SS","AirNav live","6007 ft","24 hr self-serve",6.34,"GlobalAir 10/14, unconfirmed"],
+["KIWA","Mesa Gateway",80.1,1384,8.48,"FS","AirNav live","10401 ft"],
+["KCHD","Chandler Muni",81.9,1243,6.70,"SS","AirNav live","4870 ft"],
+["P19","Stellar Airpark",86.4,1179,6.90,"SS","AirNav live","4417 ft","24 hr self-serve"],
+["KDGL","Douglas Muni",86.8,4173,6.60,"SS","SkyVector 10/22","5760 ft"],
+["KFFZ","Falcon Field",89.9,1394,7.56,"SS","AirNav live","5100 ft"],
+["KPHX","Phoenix Sky Harbor",95.8,1135,8.61,"FS","AirNav live","11489 ft"]
 ];
-const CAP=50;let cond="day";
+const CAP=50, KTUS_ELEV=2641, TAXI_MIN=3;
+let cond="day";
 const $=id=>document.getElementById(id), m=n=>"$"+n.toFixed(2);
+const num=(id,fb,min)=>{const v=parseFloat($(id).value); const n=isFinite(v)?v:fb; return min==null?n:Math.max(min,n);};
 document.querySelectorAll("#cond button").forEach(b=>b.onclick=()=>{cond=b.dataset.v;document.querySelectorAll("#cond button").forEach(x=>x.classList.toggle("on",x===b));calc();});
-["start","end","taxi","ktas","gph","ktus","alt"].forEach(id=>{$(id).addEventListener("input",calc);$(id).addEventListener("change",calc);});
+["start","end","ktas","gph","maxnm","ktus","alt","calt","taxi","clrate","clkt","clgph","dsrate","dsgph"].forEach(id=>{$(id).addEventListener("input",calc);$(id).addEventListener("change",calc);});
+function fly(Ed,Ea,D,q){
+  const segs=H=>{const cMin=(H-Ed)/q.climbFpm, dMin=(H-Ea)/q.descFpm; return {cMin,dMin,cNm:cMin/60*q.climbKt, dNm:dMin/60*q.tas};};
+  let H=q.alt, capped=false, s=segs(H);
+  if(s.cNm+s.dNm>D+0.01||H<Ed||H<Ea){
+    capped=true;
+    const ac=q.climbKt/q.climbFpm, ad=q.tas/q.descFpm;
+    H=(D*60+Ed*ac+Ea*ad)/(ac+ad);
+    s=segs(H);
+  }
+  if(s.cMin<-0.05||s.dMin<-0.05) return {ok:false};
+  const cruiseNm=capped?0:Math.max(0,D-s.cNm-s.dNm), cruiseMin=cruiseNm/q.tas*60;
+  const fuel=q.taxi+Math.max(0,s.cMin)/60*q.climbGph+cruiseMin/60*q.cruiseGph+Math.max(0,s.dMin)/60*q.descGph;
+  const mins=Math.max(0,s.cMin)+cruiseMin+Math.max(0,s.dMin)+TAXI_MIN;
+  return {ok:true,fuel,mins,toc:H,capped};
+}
 function calc(){
   const clamp=v=>Math.max(0,Math.min(CAP,parseFloat(v)||0));
-  const s=clamp($("start").value), e=clamp($("end").value), taxi=Math.max(0,parseFloat($("taxi").value)||0);
-  const TAS=Math.max(1,parseFloat($("ktas").value)||200), GPH=Math.max(0.1,parseFloat($("gph").value)||10.5);
-  const res=(cond==="day"?0.5:0.75)*GPH, k=parseFloat($("ktus").value), alt=$("alt").checked;
+  const s=clamp($("start").value), e=clamp($("end").value);
+  const q={
+    alt:num("calt",9000,0), tas:num("ktas",200,1), cruiseGph:num("gph",10.5,0.1),
+    taxi:num("taxi",0.5,0), climbFpm:num("clrate",1000,1), climbKt:num("clkt",130,1),
+    climbGph:num("clgph",14,0), descFpm:num("dsrate",500,1), descGph:num("dsgph",7,0)
+  };
+  const maxNm=num("maxnm",100,0);
+  const res=(cond==="day"?0.5:0.75)*q.cruiseGph, k=parseFloat($("ktus").value), alt=$("alt").checked;
   const need=e-s, base=need*k, ok=[], no=[];
   if(need<=0||e<res){
     $("call").className="call warn";
@@ -100,12 +138,14 @@ function calc(){
     $("list").innerHTML="";$("nodet").style.display="none";return;
   }
   for(const a of A){
-    const price=alt&&a[8]?a[8]:a[3], src=alt&&a[8]?a[9]:a[5];
-    const leg=taxi+a[2]/TAS*GPH, mins=2*a[2]/TAS*60+10;
-    if(s-leg<res){no.push([a,"Outbound leg would land below reserve."]);continue;}
-    if(e+leg>CAP){no.push([a,"Can land at KTUS with at most "+(CAP-leg).toFixed(1)+" gal from here."]);continue;}
-    const buy=e+leg-(s-leg), cost=buy*price;
-    ok.push({a,price,src,buy,cost,save:base-cost,mins});
+    if(a[2]>maxNm){no.push([a,"beyond max distance"]);continue;}
+    const price=alt&&a[9]?a[9]:a[4], src=alt&&a[9]?a[10]:a[6];
+    const out=fly(KTUS_ELEV,a[3],a[2],q), back=fly(a[3],KTUS_ELEV,a[2],q);
+    if(!out.ok||!back.ok){no.push([a,"Not enough distance to climb and descend between these elevations."]);continue;}
+    if(s-out.fuel<res){no.push([a,"Outbound leg would land below reserve."]);continue;}
+    if(e+back.fuel>CAP){no.push([a,"Can land at KTUS with at most "+(CAP-back.fuel).toFixed(1)+" gal from here."]);continue;}
+    const buy=e+out.fuel+back.fuel-s, cost=buy*price, mins=out.mins+back.mins;
+    ok.push({a,price,src,buy,cost,save:base-cost,mins,out,back});
   }
   ok.sort((x,y)=>x.cost-y.cost);
   const b=ok[0];
@@ -114,9 +154,13 @@ function calc(){
   let h='<div class="card"><div class="row1"><span>KTUS – just buy here</span><span>'+m(base)+'</span></div><div class="row2">'+m(k)+' FS · buy '+need.toFixed(1)+' gal · lands with '+e.toFixed(1)+' gal</div></div>';
   for(const r of ok){
     const cls=r.save>0?"good":"bad", t=r.save>=0?"saves "+m(r.save):"costs "+m(-r.save)+" more";
+    const toc=[];
+    if(r.out.capped) toc.push(Math.round(r.out.toc)+" ft out");
+    if(r.back.capped) toc.push(Math.round(r.back.toc)+" ft back");
     h+='<div class="card"><div class="row1"><span>'+r.a[0]+' '+r.a[1]+'</span><span>'+m(r.cost)+'</span></div>'+
-      '<div class="row2"><span class="'+cls+'">'+t+'</span> · '+r.a[2].toFixed(1)+' NM · '+Math.round(r.mins)+' min · buy '+r.buy.toFixed(1)+' gal @ '+m(r.price)+' '+r.a[4]+'</div>'+
-      '<div class="row2">'+r.src+' · rwy '+r.a[6]+(r.a[7]?' · '+r.a[7]:'')+'</div></div>';
+      '<div class="row2"><span class="'+cls+'">'+t+'</span> · '+r.a[2].toFixed(1)+' NM · '+Math.round(r.mins)+' min round trip · buy '+r.buy.toFixed(1)+' gal @ '+m(r.price)+' '+r.a[5]+'</div>'+
+      '<div class="row2">out '+r.out.fuel.toFixed(1)+' gal / back '+r.back.fuel.toFixed(1)+' gal'+(toc.length?' · TOC capped '+toc.join(' / '):'')+'</div>'+
+      '<div class="row2">'+r.src+' · rwy '+r.a[7]+(r.a[8]?' · '+r.a[8]:'')+'</div></div>';
   }
   $("list").innerHTML=h;
   $("nodet").style.display=no.length?"block":"none";
