@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fuel Run">
+<meta name="color-scheme" content="light dark">
+<title>KTUS Fuel Run Planner – N721NE</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{--bg:#fff;--fg:#111;--mut:#666;--bd:#ddd;--card:#f6f6f7;--good:#137333;--bad:#b3261e;--acc:#0a66d8}
+@media (prefers-color-scheme:dark){:root{--bg:#111;--fg:#eee;--mut:#9a9a9a;--bd:#333;--card:#1c1c1e;--good:#5cd27a;--bad:#ff7b72;--acc:#4ea1ff}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.4 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;background:var(--bg);color:var(--fg);padding:env(safe-area-inset-top) 14px 40px}
+h1{font-size:22px;margin:16px 0 4px}
+.sub{color:var(--mut);font-size:13px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+label{display:block;font-size:13px;color:var(--mut)}
+input,select{width:100%;font-size:17px;padding:9px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--fg);margin-top:3px}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-top:3px}
+.seg button{flex:1;padding:9px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--fg);font-size:15px}
+.seg button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--fg);margin-top:10px}
+.chk input{width:auto}
+.call{margin:16px 0;padding:12px 14px;border-radius:12px;background:var(--card);border-left:4px solid var(--acc)}
+.call.good{border-color:var(--good)} .call.warn{border-color:var(--bad)}
+.card{border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin:8px 0}
+.row1{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+.row2{color:var(--mut);font-size:13px;margin-top:3px}
+.good{color:var(--good)} .bad{color:var(--bad)}
+details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
+.foot{color:var(--mut);font-size:12px;margin-top:20px}
+</style>
+</head>
+<body>
+<h1>KTUS Fuel Run Planner</h1>
+<div class="sub">N721NE · RV-14 · 200 KTAS · 10.5 gal/hr · 50 gal usable · prices checked 24 Oct 2026</div>
+
+<div class="grid">
+  <div><label>Fuel on board now (gal)<input id="start" type="number" inputmode="decimal" value="20"></label></div>
+  <div><label>Fuel wanted landing at KTUS (gal)<input id="end" type="number" inputmode="decimal" value="45"></label></div>
+  <div><label>Taxi/takeoff/climb per leg (gal)<input id="taxi" type="number" inputmode="decimal" value="1"></label></div>
+  <div><label>KTUS baseline<select id="ktus">
+    <option value="8.30">Executive Air $8.30 FS</option>
+    <option value="8.40">Tucson Jet Center $8.40 FS</option>
+    <option value="8.45">Atlantic $8.45 FS</option>
+    <option value="8.55">Million Air $8.55 FS</option>
+  </select></label></div>
+</div>
+<label style="margin-top:10px">Reserve</label>
+<div class="seg" id="cond"><button data-v="day" class="on">Day VFR (30 min)</button><button data-v="night">Night VFR (45 min)</button></div>
+<label class="chk"><input type="checkbox" id="alt"> Use unconfirmed lower prices (Bisbee $5.33, Safford $6.34)</label>
+
+<div id="call" class="call"></div>
+<div id="list"></div>
+<details id="nodet"><summary>Not possible with these inputs</summary><div id="no"></div></details>
+
+<div class="foot">Fuel per leg = taxi allowance + NM ÷ 200 × 10.5. Outbound is legal if fuel on board − leg fuel ≥ reserve. Gallons bought = ending fuel + 2 × leg fuel − fuel on board (tank max 50). Flight time = round-trip cruise + 10 min. Still air, no winds. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
+
+<script>
+const A=[
+["KRYN","Ryan Field",11.9,7.45,"SS","AirNav live","5500 ft"],
+["KAVQ","Marana Regional",22.5,7.45,"SS","SkyVector 10/19","6901 ft"],
+["E95","Benson Muni",30.5,6.99,"FS","SkyVector 10/21","4002 ft","City self-serve $7.24"],
+["KMZJ","Pinal Airpark",30.6,7.00,"FS","GlobalAir 10/12","6849 ft"],
+["E77","San Manuel",34.6,6.85,"SS","SkyVector 10/22","4207 ft","24 hr self-serve"],
+["KOLS","Nogales Intl",42.3,7.95,"FS","AirNav live","7200 ft"],
+["KFHU","Sierra Vista Muni",44.0,7.12,"SS","AirNav 10/23","12001 ft"],
+["E60","Eloy Muni",52.8,6.95,"SS","AirNav 10/14","3901 ft","24 hr self-serve"],
+["P33","Cochise County (Willcox)",53.8,7.18,"FS","AirNav 10/20","6095 ft"],
+["P08","Coolidge Muni",55.0,6.59,"SS","AirNav live","5564 ft"],
+["KCGZ","Casa Grande Muni",65.4,7.05,"SS","AirNav live","5200 ft","24 hr self-serve"],
+["P04","Bisbee Muni",70.3,7.00,"SS","SkyVector 10/6","5929 ft","Assisted self-serve, 24 hr",5.33,"GlobalAir 10/15, unconfirmed"],
+["A39","Ak-Chin Regional",72.1,6.60,"SS","All sources 10/19","4751 ft","24 hr self-serve"],
+["KDUG","Bisbee Douglas Intl",78.6,7.48,"SS","AirNav 10/23","6430 ft"],
+["KSAD","Safford Regional",79.6,6.99,"SS","AirNav live","6007 ft","24 hr self-serve",6.34,"GlobalAir 10/14, unconfirmed"],
+["KIWA","Mesa Gateway",80.1,8.48,"FS","AirNav live","10401 ft"],
+["KCHD","Chandler Muni",81.9,6.70,"SS","AirNav live","4870 ft"],
+["P19","Stellar Airpark",86.4,6.90,"SS","AirNav live","4417 ft","24 hr self-serve"],
+["KDGL","Douglas Muni",86.8,6.60,"SS","SkyVector 10/22","5760 ft"],
+["KFFZ","Falcon Field",89.9,7.56,"SS","AirNav live","5100 ft"],
+["KPHX","Phoenix Sky Harbor",95.8,8.61,"FS","AirNav live","11489 ft"]
+];
+const CAP=50,TAS=200,GPH=10.5;let cond="day";
+const $=id=>document.getElementById(id), m=n=>"$"+n.toFixed(2);
+document.querySelectorAll("#cond button").forEach(b=>b.onclick=()=>{cond=b.dataset.v;document.querySelectorAll("#cond button").forEach(x=>x.classList.toggle("on",x===b));calc();});
+["start","end","taxi","ktus","alt"].forEach(id=>{$(id).addEventListener("input",calc);$(id).addEventListener("change",calc);});
+function calc(){
+  const clamp=v=>Math.max(0,Math.min(CAP,parseFloat(v)||0));
+  const s=clamp($("start").value), e=clamp($("end").value), taxi=Math.max(0,parseFloat($("taxi").value)||0);
+  const res=(cond==="day"?0.5:0.75)*GPH, k=parseFloat($("ktus").value), alt=$("alt").checked;
+  const need=e-s, base=need*k, ok=[], no=[];
+  if(need<=0||e<res){
+    $("call").className="call warn";
+    $("call").textContent= need<=0?"You already have at least that much fuel, so there's nothing to buy.":"Ending fuel must be at least the "+cond+" reserve of "+res.toFixed(2)+" gal.";
+    $("list").innerHTML="";$("nodet").style.display="none";return;
+  }
+  for(const a of A){
+    const price=alt&&a[8]?a[8]:a[3], src=alt&&a[8]?a[9]:a[5];
+    const leg=taxi+a[2]/TAS*GPH, mins=2*a[2]/TAS*60+10;
+    if(s-leg<res){no.push([a,"Outbound leg would land below reserve."]);continue;}
+    if(e+leg>CAP){no.push([a,"Can land at KTUS with at most "+(CAP-leg).toFixed(1)+" gal from here."]);continue;}
+    const buy=e+leg-(s-leg), cost=buy*price;
+    ok.push({a,price,src,buy,cost,save:base-cost,mins});
+  }
+  ok.sort((x,y)=>x.cost-y.cost);
+  const b=ok[0];
+  if(b&&b.save>0){$("call").className="call good";$("call").innerHTML="<b>Best run: "+b.a[0]+" "+b.a[1]+".</b> "+m(b.cost)+" for "+b.buy.toFixed(1)+" gal, saving "+m(b.save)+" over buying "+need.toFixed(1)+" gal at KTUS ("+m(base)+"), about "+Math.round(b.mins)+" min of flying.";}
+  else{$("call").className="call";$("call").innerHTML="<b>Fill at KTUS.</b> "+need.toFixed(1)+" gal costs "+m(base)+", and no fuel run beats that.";}
+  let h='<div class="card"><div class="row1"><span>KTUS – just buy here</span><span>'+m(base)+'</span></div><div class="row2">'+m(k)+' FS · buy '+need.toFixed(1)+' gal · lands with '+e.toFixed(1)+' gal</div></div>';
+  for(const r of ok){
+    const cls=r.save>0?"good":"bad", t=r.save>=0?"saves "+m(r.save):"costs "+m(-r.save)+" more";
+    h+='<div class="card"><div class="row1"><span>'+r.a[0]+' '+r.a[1]+'</span><span>'+m(r.cost)+'</span></div>'+
+      '<div class="row2"><span class="'+cls+'">'+t+'</span> · '+r.a[2].toFixed(1)+' NM · '+Math.round(r.mins)+' min · buy '+r.buy.toFixed(1)+' gal @ '+m(r.price)+' '+r.a[4]+'</div>'+
+      '<div class="row2">'+r.src+' · rwy '+r.a[6]+(r.a[7]?' · '+r.a[7]:'')+'</div></div>';
+  }
+  $("list").innerHTML=h;
+  $("nodet").style.display=no.length?"block":"none";
+  $("no").innerHTML=no.map(n=>'<div class="card"><div class="row1"><span>'+n[0][0]+' '+n[0][1]+'</span><span>'+n[0][2].toFixed(1)+' NM</span></div><div class="row2">'+n[1]+'</div></div>').join("");
+}
+calc();
+</script>
+</body>
+</html>
