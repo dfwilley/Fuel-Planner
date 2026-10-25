@@ -35,11 +35,13 @@ details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
 </head>
 <body>
 <h1>KTUS Fuel Run Planner</h1>
-<div class="sub">N721NE · RV-14 · 200 KTAS · 10.5 gal/hr · 50 gal usable · prices checked 24 Oct 2026</div>
+<div class="sub">N721NE · RV-14 · 50 gal usable · prices checked 24 Oct 2026</div>
 
 <div class="grid">
   <div><label>Fuel on board now (gal)<input id="start" type="number" inputmode="decimal" value="20"></label></div>
   <div><label>Fuel wanted landing at KTUS (gal)<input id="end" type="number" inputmode="decimal" value="45"></label></div>
+  <div><label>Cruise speed (KTAS)<input id="ktas" type="number" inputmode="decimal" value="200"></label></div>
+  <div><label>Fuel burn (gal/hr)<input id="gph" type="number" inputmode="decimal" value="10.5"></label></div>
   <div><label>Taxi/takeoff/climb per leg (gal)<input id="taxi" type="number" inputmode="decimal" value="1"></label></div>
   <div><label>KTUS baseline<select id="ktus">
     <option value="8.30">Executive Air $8.30 FS</option>
@@ -56,7 +58,7 @@ details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
 <div id="list"></div>
 <details id="nodet"><summary>Not possible with these inputs</summary><div id="no"></div></details>
 
-<div class="foot">Fuel per leg = taxi allowance + NM ÷ 200 × 10.5. Outbound is legal if fuel on board − leg fuel ≥ reserve. Gallons bought = ending fuel + 2 × leg fuel − fuel on board (tank max 50). Flight time = round-trip cruise + 10 min. Still air, no winds. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
+<div class="foot">Fuel per leg = taxi allowance + NM ÷ KTAS × gal/hr. Reserve = 30 or 45 min at your fuel burn. Outbound is legal if fuel on board − leg fuel ≥ reserve. Gallons bought = ending fuel + 2 × leg fuel − fuel on board (tank max 50). Flight time = round-trip cruise + 10 min. Still air, no winds. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
 
 <script>
 const A=[
@@ -82,13 +84,14 @@ const A=[
 ["KFFZ","Falcon Field",89.9,7.56,"SS","AirNav live","5100 ft"],
 ["KPHX","Phoenix Sky Harbor",95.8,8.61,"FS","AirNav live","11489 ft"]
 ];
-const CAP=50,TAS=200,GPH=10.5;let cond="day";
+const CAP=50;let cond="day";
 const $=id=>document.getElementById(id), m=n=>"$"+n.toFixed(2);
 document.querySelectorAll("#cond button").forEach(b=>b.onclick=()=>{cond=b.dataset.v;document.querySelectorAll("#cond button").forEach(x=>x.classList.toggle("on",x===b));calc();});
-["start","end","taxi","ktus","alt"].forEach(id=>{$(id).addEventListener("input",calc);$(id).addEventListener("change",calc);});
+["start","end","taxi","ktas","gph","ktus","alt"].forEach(id=>{$(id).addEventListener("input",calc);$(id).addEventListener("change",calc);});
 function calc(){
   const clamp=v=>Math.max(0,Math.min(CAP,parseFloat(v)||0));
   const s=clamp($("start").value), e=clamp($("end").value), taxi=Math.max(0,parseFloat($("taxi").value)||0);
+  const TAS=Math.max(1,parseFloat($("ktas").value)||200), GPH=Math.max(0.1,parseFloat($("gph").value)||10.5);
   const res=(cond==="day"?0.5:0.75)*GPH, k=parseFloat($("ktus").value), alt=$("alt").checked;
   const need=e-s, base=need*k, ok=[], no=[];
   if(need<=0||e<res){
