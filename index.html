@@ -131,17 +131,17 @@ const esc=s=>String(s).replace(/[&<>]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;"}
 function lookup(raw){
   const id=String(raw||"").trim().toUpperCase();
   let a=A.find(x=>x.id===id);
-  if(!a && /^[A-Z0-9]{3}$/.test(id)) a=A.find(x=>x.id==="K"+id);
+  if(!a && /^[A-Z]{3}$/.test(id)) a=A.find(x=>x.id==="K"+id);
   if(!a && id.length===4 && id[0]==="K") a=A.find(x=>x.id===id.slice(1));
   return a||null;
 }
-const CACHE="n721ne-fuel-aptcache";
+const CACHE="n721ne-fuel-aptcache2";
 let dirIndex=null, dirPromise=null, dirFailed=false, inflight="", activeRaw="", lookupTimer=0;
 const session=new Map();
 function cacheAll(){try{return JSON.parse(localStorage.getItem(CACHE)||"{}")||{};}catch(e){return {};}}
 function cacheGet(raw){
   const db=cacheAll(), keys=[raw];
-  if(raw.length===3) keys.push("K"+raw);
+  if(/^[A-Z]{3}$/.test(raw)) keys.push("K"+raw);
   if(raw.length===4 && raw[0]==="K") keys.push(raw.slice(1));
   for(const k of keys) if(db[k]) return db[k];
   return null;
@@ -159,13 +159,14 @@ function cachePut(typed, rec){
 }
 function buildIndex(rows){
   const by=new Map();
-  const recs=rows.map(r=>({id:r[0],local:r[1]||"",iata:r[2]||"",name:r[3],lat:r[4],lon:r[5],elev:r[6]}));
+  const recs=rows.map(r=>({id:r[0],local:r[1]||"",iata:r[2]||"",name:r[3],lat:r[4],lon:r[5],elev:r[6],alias:r[7]||""}));
   const add=(key,rec)=>{if(key && !by.has(key)) by.set(key, rec);};
   recs.forEach(r=>add(r.id, r));
   recs.forEach(r=>{
     add(r.local, r); add(r.iata, r);
-    if(r.id.length===3) add("K"+r.id, r);
-    if(r.local.length===3) add("K"+r.local, r);
+    r.alias.split(" ").forEach(a=>add(a, r));
+    if(/^[A-Z]{3}$/.test(r.local)) add("K"+r.local, r);
+    if(/^[A-Z]{3}$/.test(r.id)) add("K"+r.id, r);
   });
   return by;
 }
@@ -226,10 +227,11 @@ function ensurePrice(home, alt){
   const key=home.manual?"manual":home.lookedUp?home.id+"|L":home.id+"|"+(alt?1:0);
   if(key!==priceKey){
     const enteringManual=home.manual && priceKey!=="manual";
+    const keepTyped=home.lookedUp && /\|L$/.test(priceKey) && $("basePrice").value!=="";
     priceKey=key;
     const f=filedPrice(home, alt);
     if(f) $("basePrice").value=String(f.price);
-    else if(!home.manual || enteringManual) $("basePrice").value="";
+    else if(!keepTyped && (!home.manual || enteringManual)) $("basePrice").value="";
   }
   const v=parseFloat($("basePrice").value);
   return isFinite(v)&&v>0?v:null;
@@ -456,6 +458,16 @@ try{
       const found={id,name:rec.name||id,lat:+rec.lat,lon:+rec.lon,elev:rec.elev==null||rec.elev===""?null:+rec.elev,local:""};
       session.set(id, found);
       cachePut(id, found);
+      // Older saves used a K prefix OurAirports invents for FAA codes that contain a digit (KE63). Confirm the real id.
+      if(/^K[A-Z0-9]{3}$/.test(id) && /\d/.test(id)){
+        loadDir().then(idx=>{
+          const real=idx&&idx.get(id);
+          if(!real || real.id===id) return;
+          session.set(id, real); session.set(real.id, real); cachePut(id, real);
+          const cur=$("home").value.trim().toUpperCase();
+          if(cur===id || cur===real.id) calc();
+        }).catch(()=>{});
+      }
     }else if(rec.miss || rec.manual){
       if(rec.lat!=null && rec.lat!=="") $("manLat").value=rec.lat;
       if(rec.lon!=null && rec.lon!=="") $("manLon").value=rec.lon;
