@@ -1,8 +1,8 @@
 # Fuel Planner
 
-Self-contained 100LL fuel-run planner for N721NE, an RV-14 based at KTUS (Tucson).
+Self-contained 100LL fuel-run planner for N721NE, an RV-14. The starting airport defaults to KTUS and can be changed; the phone remembers the last choice.
 
-It compares buying avgas at KTUS with a round trip to a nearby airport. The numbers assume still air, 200 KTAS, 10.5 gal/hr, 50 gallons usable, and a day (30 min) or night (45 min) VFR reserve. Prices are a snapshot checked 24 Oct 2026 and do not update themselves.
+It compares buying avgas at the starting airport with a round trip to another field within the chosen distance. Distances are great-circle tracks between the airports embedded in the page (the Tucson-area list). An identifier that is not in that list needs a latitude, longitude, and field elevation. Cruise defaults remain still air, 200 KTAS, 10.5 gal/hr, 50 gallons usable, and a day (30 min) or night (45 min) VFR reserve. Prices are a snapshot checked 24 Oct 2026 and do not update themselves.
 
 Open [index.html](index.html) in a browser, or use the GitHub Pages site: https://dfwilley.github.io/Fuel-Planner/
 
