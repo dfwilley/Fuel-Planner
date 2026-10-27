@@ -94,7 +94,7 @@ details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
 <div id="list"></div>
 <details id="nodet"><summary>Not possible with these inputs</summary><div id="no"></div></details>
 
-<div class="foot">Each leg is climb, then cruise, then descent, in still air. Climb time is (top of climb − departure elevation) ÷ climb rate, and climb distance is that time at climb speed. Descent time is (top of climb − arrival elevation) ÷ descent rate, flown at cruise KTAS. Cruise distance is the leg distance minus climb and descent distance, at cruise KTAS and the cruise fuel burn. If climb plus descent would be longer than the leg, the top of climb is lowered so those two segments exactly equal the distance and there is no cruise. Leg fuel = taxi/takeoff + climb fuel + cruise fuel + descent fuel. Outbound is from the starting airport to the candidate and the return is the reverse, so the legs differ when the field elevations differ. Distance and bearing are the great-circle track between airport reference points. The database is only the fields embedded in this page; an identifier that is not listed needs a latitude, longitude, and field elevation. Outbound is legal if fuel on board − outbound fuel ≥ reserve (30 or 45 min at the cruise fuel burn). Gallons bought = ending fuel + outbound fuel + return fuel − fuel on board (tank max 50). Flight time is both legs' climb, cruise, and descent, plus 3 min of taxi per leg. Airports farther than the maximum distance are left out. Field elevations are FAA airport data via aviationweather.gov (meters, converted to feet) or, where that feed has no record, the AirNav surveyed field elevation. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
+<div class="foot">Each leg is climb, then cruise, then descent, in still air. Climb time is (top of climb − departure elevation) ÷ climb rate, and climb distance is that time at climb speed. Descent time is (top of climb − arrival elevation) ÷ descent rate, flown at cruise KTAS. Cruise distance is the leg distance minus climb and descent distance, at cruise KTAS and the cruise fuel burn. If climb plus descent would be longer than the leg, the top of climb is lowered so those two segments exactly equal the distance and there is no cruise. Leg fuel = taxi/takeoff + climb fuel + cruise fuel + descent fuel. Outbound is from the starting airport to the candidate and the return is the reverse, so the legs differ when the field elevations differ. Distance and bearing are the great-circle track between airport reference points. An identifier that is not in the Tucson-area list is looked up in a bundled directory of US airports (OurAirports, public domain). If it is not there either, enter latitude, longitude, and field elevation. Outbound is legal if fuel on board − outbound fuel ≥ reserve (30 or 45 min at the cruise fuel burn). Gallons bought = ending fuel + outbound fuel + return fuel − fuel on board (tank max 50). Flight time is both legs' climb, cruise, and descent, plus 3 min of taxi per leg. Airports farther than the maximum distance are left out. Field elevations are FAA airport data via aviationweather.gov (meters, converted to feet) or, where that feed has no record, the AirNav surveyed field elevation. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
 
 <script>
 // Coordinates are airport reference points. K-prefixed fields: FAA via aviationweather.gov.
@@ -131,8 +131,81 @@ const esc=s=>String(s).replace(/[&<>]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;"}
 function lookup(raw){
   const id=String(raw||"").trim().toUpperCase();
   let a=A.find(x=>x.id===id);
-  if(!a && /^[A-Z0-9]{3}$/.test(id)) a=A.find(x=>x.id==="K"+id);
+  if(!a && /^[A-Z]{3}$/.test(id)) a=A.find(x=>x.id==="K"+id);
+  if(!a && id.length===4 && id[0]==="K") a=A.find(x=>x.id===id.slice(1));
   return a||null;
+}
+const CACHE="n721ne-fuel-aptcache2";
+let dirIndex=null, dirPromise=null, dirFailed=false, inflight="", activeRaw="", lookupTimer=0;
+const session=new Map();
+function cacheAll(){try{return JSON.parse(localStorage.getItem(CACHE)||"{}")||{};}catch(e){return {};}}
+function cacheGet(raw){
+  const db=cacheAll(), keys=[raw];
+  if(/^[A-Z]{3}$/.test(raw)) keys.push("K"+raw);
+  if(raw.length===4 && raw[0]==="K") keys.push(raw.slice(1));
+  for(const k of keys) if(db[k]) return db[k];
+  return null;
+}
+function cachePut(typed, rec){
+  const db=cacheAll();
+  const entry={id:rec.id,name:rec.name,lat:rec.lat,lon:rec.lon,elev:rec.elev,local:rec.local||"",iata:rec.iata||""};
+  const keep=new Set([typed, rec.id, entry.local, entry.iata]);
+  db[typed]=entry; db[rec.id]=entry;
+  if(entry.local) db[entry.local]=entry;
+  if(entry.iata) db[entry.iata]=entry;
+  const drop=Object.keys(db).filter(k=>!keep.has(k));
+  while(Object.keys(db).length>60 && drop.length) delete db[drop.shift()];
+  try{localStorage.setItem(CACHE, JSON.stringify(db));}catch(e){}
+}
+function buildIndex(rows){
+  const by=new Map();
+  const recs=rows.map(r=>({id:r[0],local:r[1]||"",iata:r[2]||"",name:r[3],lat:r[4],lon:r[5],elev:r[6],alias:r[7]||""}));
+  const add=(key,rec)=>{if(key && !by.has(key)) by.set(key, rec);};
+  recs.forEach(r=>add(r.id, r));
+  recs.forEach(r=>{
+    add(r.local, r); add(r.iata, r);
+    r.alias.split(" ").forEach(a=>add(a, r));
+    if(/^[A-Z]{3}$/.test(r.local)) add("K"+r.local, r);
+    if(/^[A-Z]{3}$/.test(r.id)) add("K"+r.id, r);
+  });
+  return by;
+}
+function loadDir(){
+  if(dirIndex) return Promise.resolve(dirIndex);
+  if(dirFailed) return Promise.resolve(null);
+  if(!dirPromise){
+    dirPromise=fetch("airports.json").then(r=>{if(!r.ok) throw new Error("airport list "+r.status); return r.json();}).then(rows=>{dirIndex=buildIndex(rows); return dirIndex;}).catch(e=>{dirFailed=true; dirPromise=null; throw e;});
+  }
+  return dirPromise;
+}
+function asHome(rec){
+  return {id:rec.id,name:rec.name,elev:rec.elev,lat:rec.lat,lon:rec.lon,price:null,svc:"",src:"OurAirports",rwy:"",lookedUp:true};
+}
+function foundLine(home){
+  const elev=home.elev==null?"elevation not on file":Math.round(home.elev)+" ft";
+  return home.id+" · "+home.name+" · "+Number(home.lat).toFixed(4)+", "+Number(home.lon).toFixed(4)+" · "+elev;
+}
+function showFound(home){
+  $("manual").hidden=home.elev!=null;
+  $("unk").hidden=false; $("unk").className="hint";
+  $("unk").textContent=foundLine(home);
+  $("ktusBox").hidden=true; $("priceBox").hidden=false;
+}
+let lookupGen=0;
+function lookupDir(raw){
+  const gen=++lookupGen;
+  loadDir().then(idx=>{
+    if(gen!==lookupGen) return;
+    const rec=idx?idx.get(raw)||null:null;
+    session.set(raw, rec);
+    if(rec){session.set(rec.id, rec); cachePut(raw, rec);}
+    inflight="";
+    if($("home").value.trim().toUpperCase()===raw || $("home").value.trim().toUpperCase()===(rec&&rec.id)) calc();
+  }).catch(()=>{
+    if(gen!==lookupGen) return;
+    session.set(raw, null); inflight="";
+    if($("home").value.trim().toUpperCase()===raw) calc();
+  });
 }
 function track(a,b){
   const R=3440.065, rad=Math.PI/180;
@@ -151,13 +224,14 @@ function filedPrice(home, alt){
   return {price:home.price, src:home.src||"", svc:home.svc||""};
 }
 function ensurePrice(home, alt){
-  const key=home.manual?"manual":home.id+"|"+(alt?1:0);
+  const key=home.manual?"manual":home.lookedUp?home.id+"|L":home.id+"|"+(alt?1:0);
   if(key!==priceKey){
     const enteringManual=home.manual && priceKey!=="manual";
+    const keepTyped=home.lookedUp && /\|L$/.test(priceKey) && $("basePrice").value!=="";
     priceKey=key;
     const f=filedPrice(home, alt);
     if(f) $("basePrice").value=String(f.price);
-    else if(!home.manual || enteringManual) $("basePrice").value="";
+    else if(!keepTyped && (!home.manual || enteringManual)) $("basePrice").value="";
   }
   const v=parseFloat($("basePrice").value);
   return isFinite(v)&&v>0?v:null;
@@ -169,13 +243,24 @@ function buildManual(id){
   if(!isFinite(elev)) return {why:"Enter the field elevation (ft MSL) so climb and descent can be computed."};
   return {home:{id, name:"Custom position", elev, lat, lon, price:null, svc:"", src:"Entered coordinates", rwy:"", manual:true}};
 }
-function persist(id, manual){
-  const rec={id};
-  if(manual){
+function persist(home){
+  const rec={id:home.id};
+  if(home.manual){
+    rec.manual=true;
     rec.lat=$("manLat").value; rec.lon=$("manLon").value; rec.elev=$("manElev").value;
+    if($("basePrice").value!=="") rec.price=$("basePrice").value;
+    if(!dirFailed) rec.miss=true;
+  }else if(home.lookedUp){
+    rec.lookedUp=true; rec.name=home.name; rec.lat=home.lat; rec.lon=home.lon; rec.elev=home.elev;
     if($("basePrice").value!=="") rec.price=$("basePrice").value;
   }
   try{localStorage.setItem(LS, JSON.stringify(rec));}catch(e){}
+}
+function noteRaw(raw){
+  if(raw===activeRaw) return;
+  activeRaw=raw;
+  $("manLat").value=""; $("manLon").value=""; $("manElev").value="";
+  $("basePrice").value=""; priceKey="";
 }
 function clearOut(){$("list").innerHTML="";$("nodet").style.display="none";}
 function paintId(id){
@@ -213,6 +298,7 @@ function fly(Ed,Ea,D,q){
 function calc(){
   const raw=$("home").value.trim().toUpperCase();
   const shown=raw||"…";
+  clearTimeout(lookupTimer);
   paintId(shown);
   if(raw.length<3){
     $("unk").hidden=false; $("unk").textContent="Enter an airport identifier, such as KTUS.";
@@ -220,28 +306,76 @@ function calc(){
     $("call").className="call"; $("call").textContent="Enter the starting airport.";
     clearOut(); return;
   }
+  noteRaw(raw);
   const known=lookup(raw);
   let home;
   if(!known){
-    $("manual").hidden=false; $("ktusBox").hidden=true; $("priceBox").hidden=false; $("unk").hidden=false;
-    const built=buildManual(raw);
-    if(!built.home){
-      $("unk").textContent=raw+" is not in the airport database. "+built.why;
-      $("priceNote").className="note";
-      $("priceNote").textContent="No price is known for "+raw+". Enter a baseline price if you use these coordinates.";
-      $("call").className="call warn"; $("call").textContent=$("unk").textContent;
-      clearOut(); persist(raw,true); return;
+    let rec=cacheGet(raw);
+    if(!rec && session.has(raw)) rec=session.get(raw);
+    if(rec){
+      home=asHome(rec);
+      if($("home").value.trim().toUpperCase()!==home.id){$("home").value=home.id; activeRaw=home.id;}
+      paintId(home.id);
+      const elevWasMissing=rec.elev==null;
+      if(elevWasMissing){
+        if(!$("manLat").value) $("manLat").value=home.lat;
+        if(!$("manLon").value) $("manLon").value=home.lon;
+        const lat=parseFloat($("manLat").value), lon=parseFloat($("manLon").value), elev=parseFloat($("manElev").value);
+        if(isFinite(lat)) home.lat=lat;
+        if(isFinite(lon)) home.lon=lon;
+        if(isFinite(elev)) home.elev=elev;
+      }
+      showFound(home);
+      if(home.elev==null){
+        $("unk").textContent=foundLine(home)+". Enter the field elevation (ft MSL).";
+        $("priceNote").className="note";
+        $("priceNote").textContent="No price is known for "+home.id+". Enter a baseline price to compare with buying fuel there.";
+        $("call").className="call warn"; $("call").textContent=$("unk").textContent;
+        clearOut(); persist(home); return;
+      }
+      if(elevWasMissing) cachePut(home.id, Object.assign({}, rec, {lat:home.lat,lon:home.lon,elev:home.elev}));
+    }else if(session.has(raw)){
+      $("manual").hidden=false; $("ktusBox").hidden=true; $("priceBox").hidden=false; $("unk").hidden=false; $("unk").className="note";
+      const built=buildManual(raw);
+      if(!built.home){
+        const lead=dirFailed?("The airport directory did not load, so "+raw+" could not be looked up."):(raw+" is not in the airport database.");
+        $("unk").textContent=lead+" "+(built.why||"Enter latitude and longitude to plan from there, or choose a listed airport.");
+        $("priceNote").className="note";
+        $("priceNote").textContent="No price is known for "+raw+". Enter a baseline price if you use these coordinates.";
+        $("call").className="call warn"; $("call").textContent=$("unk").textContent;
+        clearOut();
+        const partial={id:raw};
+        if($("manLat").value||$("manLon").value||$("manElev").value||$("basePrice").value!==""){
+          partial.manual=true; partial.lat=$("manLat").value; partial.lon=$("manLon").value; partial.elev=$("manElev").value;
+          if($("basePrice").value!=="") partial.price=$("basePrice").value;
+        }
+        if(!dirFailed) partial.miss=true;
+        try{localStorage.setItem(LS, JSON.stringify(partial));}catch(e){}
+        return;
+      }
+      home=built.home;
+      $("unk").textContent=raw+" is not in the airport database. Using the coordinates you entered.";
+    }else{
+      $("unk").hidden=false; $("unk").className="hint";
+      $("unk").textContent="Looking up "+raw+"…";
+      $("manual").hidden=true; $("ktusBox").hidden=true; $("priceBox").hidden=true;
+      $("call").className="call"; $("call").textContent=$("unk").textContent;
+      clearOut();
+      lookupTimer=setTimeout(()=>{
+        if($("home").value.trim().toUpperCase()!==raw) return;
+        try{localStorage.setItem(LS, JSON.stringify({id:raw}));}catch(e){}
+        if(inflight!==raw){inflight=raw; lookupDir(raw);}
+      }, 250);
+      return;
     }
-    home=built.home;
-    $("unk").textContent=raw+" is not in the airport database. Using the coordinates you entered.";
   }else{
     home=known;
     $("manual").hidden=true; $("unk").hidden=true; $("unk").textContent="";
     $("ktusBox").hidden=home.id!=="KTUS";
     $("priceBox").hidden=home.id==="KTUS";
-    if(home.id!==raw) paintId(home.id);
+    if(home.id!==raw){$("home").value=home.id; activeRaw=home.id; paintId(home.id);}
   }
-  persist(home.id, !!home.manual);
+  persist(home);
   const clamp=v=>Math.max(0,Math.min(CAP,parseFloat(v)||0));
   const s=clamp($("start").value), e=clamp($("end").value);
   const q={
@@ -317,11 +451,33 @@ function calc(){
 try{
   const rec=JSON.parse(localStorage.getItem(LS)||"null");
   if(rec&&rec.id){
-    $("home").value=String(rec.id).toUpperCase();
-    if(rec.lat!=null) $("manLat").value=rec.lat;
-    if(rec.lon!=null) $("manLon").value=rec.lon;
-    if(rec.elev!=null) $("manElev").value=rec.elev;
-    if(rec.price!=null && rec.price!==""){$("basePrice").value=rec.price; priceKey="manual";}
+    const id=String(rec.id).toUpperCase();
+    $("home").value=id;
+    activeRaw=id;
+    if(rec.lookedUp && rec.lat!=null && rec.lon!=null && rec.lat!=="" && rec.lon!==""){
+      const found={id,name:rec.name||id,lat:+rec.lat,lon:+rec.lon,elev:rec.elev==null||rec.elev===""?null:+rec.elev,local:""};
+      session.set(id, found);
+      cachePut(id, found);
+      // Older saves used a K prefix OurAirports invents for FAA codes that contain a digit (KE63). Confirm the real id.
+      if(/^K[A-Z0-9]{3}$/.test(id) && /\d/.test(id)){
+        loadDir().then(idx=>{
+          const real=idx&&idx.get(id);
+          if(!real || real.id===id) return;
+          session.set(id, real); session.set(real.id, real); cachePut(id, real);
+          const cur=$("home").value.trim().toUpperCase();
+          if(cur===id || cur===real.id) calc();
+        }).catch(()=>{});
+      }
+    }else if(rec.miss || rec.manual){
+      if(rec.lat!=null && rec.lat!=="") $("manLat").value=rec.lat;
+      if(rec.lon!=null && rec.lon!=="") $("manLon").value=rec.lon;
+      if(rec.elev!=null && rec.elev!=="") $("manElev").value=rec.elev;
+      if(rec.miss) session.set(id, null);
+    }
+    if(rec.price!=null && rec.price!==""){
+      $("basePrice").value=rec.price;
+      priceKey=rec.lookedUp?id+"|L":"manual";
+    }
   }
 }catch(e){}
 calc();
