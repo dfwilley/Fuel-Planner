@@ -21,8 +21,9 @@ h2{font-size:15px;margin:16px 0 2px}
 .note{color:var(--bad);font-size:13px;margin:8px 0 0}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .wide{grid-column:1/-1}
-.homebox{display:flex;gap:8px;align-items:flex-end}
-.homebox label{flex:1;min-width:0}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.homebox{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.homebox label{flex:1 1 120px;min-width:0}
 .reset{margin:3px 0 0;padding:9px 2px;background:none;border:0;color:var(--acc);font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
 [hidden]{display:none !important}
 label{display:block;font-size:13px;color:var(--mut)}
@@ -48,24 +49,40 @@ details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
 
 <div class="grid">
   <div class="wide">
-    <div class="homebox">
-      <label>Starting airport<input id="home" type="text" list="apts" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" maxlength="6" value="KTUS"></label>
-      <button type="button" id="resetHome" class="reset">Reset to KTUS</button>
+    <div class="pair">
+      <div>
+        <div class="homebox">
+          <label>Starting airport<input id="home" type="text" list="apts" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" maxlength="6" value="KTUS"></label>
+          <button type="button" id="resetHome" class="reset">Reset to KTUS</button>
+        </div>
+        <p id="unk" class="note" hidden></p>
+        <div id="manual" class="grid" hidden>
+          <div><label>Latitude<input id="manLat" type="number" inputmode="decimal" step="any"></label></div>
+          <div><label>Longitude<input id="manLon" type="number" inputmode="decimal" step="any"></label></div>
+          <div><label>Field elevation (ft MSL)<input id="manElev" type="number" inputmode="decimal" step="1"></label></div>
+        </div>
+      </div>
+      <div>
+        <div class="homebox">
+          <label>Destination airport<input id="dest" type="text" list="apts" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" maxlength="6" value="KTUS"></label>
+          <button type="button" id="resetDest" class="reset">Reset to KTUS</button>
+        </div>
+        <p id="destUnk" class="note" hidden></p>
+        <div id="destManual" class="grid" hidden>
+          <div><label>Latitude<input id="destLat" type="number" inputmode="decimal" step="any"></label></div>
+          <div><label>Longitude<input id="destLon" type="number" inputmode="decimal" step="any"></label></div>
+          <div><label>Field elevation (ft MSL)<input id="destElev" type="number" inputmode="decimal" step="1"></label></div>
+        </div>
+      </div>
     </div>
     <datalist id="apts"></datalist>
-    <p id="unk" class="note" hidden></p>
-    <div id="manual" class="grid" hidden>
-      <div><label>Latitude<input id="manLat" type="number" inputmode="decimal" step="any"></label></div>
-      <div><label>Longitude<input id="manLon" type="number" inputmode="decimal" step="any"></label></div>
-      <div><label>Field elevation (ft MSL)<input id="manElev" type="number" inputmode="decimal" step="1"></label></div>
-    </div>
   </div>
   <div><label>Fuel on board now (gal)<input id="start" type="number" inputmode="decimal" value="20"></label></div>
   <div><label><span id="endLab">Fuel wanted landing at KTUS (gal)</span><input id="end" type="number" inputmode="decimal" value="38"></label></div>
   <div><label>Cruise speed (KTAS)<input id="ktas" type="number" inputmode="decimal" value="200"></label></div>
   <div><label>Fuel burn (gal/hr)<input id="gph" type="number" inputmode="decimal" value="10.5"></label></div>
   <div><label>Maximum distance (NM)<input id="maxnm" type="number" inputmode="decimal" value="100"></label></div>
-  <div id="ktusBox"><label>KTUS baseline<select id="ktus">
+  <div id="ktusBox"><label><span id="ktusLab">KTUS baseline</span><select id="ktus">
     <option value="8.30">Executive Air $8.30 FS</option>
     <option value="8.40">Tucson Jet Center $8.40 FS</option>
     <option value="8.45">Atlantic $8.45 FS</option>
@@ -89,12 +106,13 @@ details{margin-top:14px} summary{cursor:pointer;color:var(--mut)}
 <label style="margin-top:10px">Reserve</label>
 <div class="seg" id="cond"><button data-v="day" class="on">Day VFR (30 min)</button><button data-v="night">Night VFR (45 min)</button></div>
 <label class="chk"><input type="checkbox" id="alt"> Use unconfirmed lower prices (Bisbee $5.33, Safford $6.34)</label>
+<p class="hint" id="effNote">Effective $/gal delivered = fuel cost ÷ gallons gained on arrival. Gallons gained = fuel landing at the destination − (fuel on board now − fuel burned flying direct from the start to the destination). When both airports are the same, that direct burn is zero and the trip is a round trip back to the start.</p>
 
 <div id="call" class="call"></div>
 <div id="list"></div>
 <details id="nodet"><summary>Not possible with these inputs</summary><div id="no"></div></details>
 
-<div class="foot">Each leg is climb, then cruise, then descent, in still air. Climb time is (top of climb − departure elevation) ÷ climb rate, and climb distance is that time at climb speed. Descent time is (top of climb − arrival elevation) ÷ descent rate, flown at cruise KTAS. Cruise distance is the leg distance minus climb and descent distance, at cruise KTAS and the cruise fuel burn. If climb plus descent would be longer than the leg, the top of climb is lowered so those two segments exactly equal the distance and there is no cruise. Leg fuel = taxi/takeoff + climb fuel + cruise fuel + descent fuel. Outbound is from the starting airport to the candidate and the return is the reverse, so the legs differ when the field elevations differ. Distance and bearing are the great-circle track between airport reference points. An identifier that is not in the Tucson-area list is looked up in a bundled directory of US airports (OurAirports, public domain). If it is not there either, enter latitude, longitude, and field elevation. Outbound is legal if fuel on board − outbound fuel ≥ reserve (30 or 45 min at the cruise fuel burn). Gallons bought = ending fuel + outbound fuel + return fuel − fuel on board (tank max 50). Flight time is both legs' climb, cruise, and descent, plus 3 min of taxi per leg. Airports farther than the maximum distance are left out. Field elevations are FAA airport data via aviationweather.gov (meters, converted to feet) or, where that feed has no record, the AirNav surveyed field elevation. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
+<div class="foot">Each leg is climb, then cruise, then descent, in still air. Climb time is (top of climb − departure elevation) ÷ climb rate, and climb distance is that time at climb speed. Descent time is (top of climb − arrival elevation) ÷ descent rate, flown at cruise KTAS. Cruise distance is the leg distance minus climb and descent distance, at cruise KTAS and the cruise fuel burn. If climb plus descent would be longer than the leg, the top of climb is lowered so those two segments exactly equal the distance and there is no cruise. Leg fuel = taxi/takeoff + climb fuel + cruise fuel + descent fuel. A fuel stop is two legs, start to the stop and then the stop to the destination. Each leg has its own distance, true course, and top of climb. When the destination is the start, the second leg is the flight home and the plan is a round trip. Distance and bearing are the great-circle track between airport reference points. An identifier that is not in the Tucson-area list is looked up in a bundled directory of US airports (OurAirports, public domain). If it is not there either, enter latitude, longitude, and field elevation. A leg is legal when fuel at departure minus fuel burned is at least the reserve (30 or 45 min at the cruise fuel burn). The first leg leaves on the fuel already on board. At the stop you buy enough to land at the destination with the fuel you asked for, and you cannot leave with more than 50 gallons. Gallons bought = landing fuel + both legs' fuel − fuel on board. The destination is also listed when it has a fuel price: fly there on the fuel already aboard and buy on arrival. Stops farther than the maximum distance from both the start and the destination are left out. Effective $/gal delivered = fuel cost ÷ gallons gained at the destination. Gallons gained = landing fuel − (fuel on board − the direct start-to-destination burn). When the start and destination are the same, that burn is zero. Flight time is both legs' climb, cruise, and descent, plus 3 min of taxi per leg. Field elevations are FAA airport data via aviationweather.gov (meters, converted to feet) or, where that feed has no record, the AirNav surveyed field elevation. Prices are a snapshot from AirNav, SkyVector, GlobalAir and FltPlan and don't update by themselves. San Carlos Apache (P13) left out: no dated price. The pilot in command checks weather, NOTAMs and TFRs and makes the go/no-go call.</div>
 
 <script>
 // Coordinates are airport reference points. K-prefixed fields: FAA via aviationweather.gov.
@@ -123,8 +141,13 @@ const A=[
 {id:"KFFZ",name:"Falcon Field",elev:1394,lat:33.4608,lon:-111.7283,price:7.56,svc:"SS",src:"AirNav live",rwy:"5100 ft"},
 {id:"KPHX",name:"Phoenix Sky Harbor",elev:1135,lat:33.4343,lon:-112.0116,price:8.61,svc:"FS",src:"AirNav live",rwy:"11489 ft"}
 ];
-const CAP=50, TAXI_MIN=3, LS="n721ne-fuel-home";
+const CAP=50, TAXI_MIN=3, LS="n721ne-fuel-home", LSD="n721ne-fuel-dest";
 let cond="day", priceKey="";
+function makeField(key, input, unk, manual, lat, lon, elev, ls){
+  return {key, input, unk, manual, lat, lon, elev, ls, active:"", gen:0, timer:0, inflight:""};
+}
+const homeF=makeField("home","home","unk","manual","manLat","manLon","manElev",LS);
+const destF=makeField("dest","dest","destUnk","destManual","destLat","destLon","destElev",LSD);
 const $=id=>document.getElementById(id), m=n=>"$"+n.toFixed(2);
 const num=(id,fb,min)=>{const v=parseFloat($(id).value); const n=isFinite(v)?v:fb; return min==null?n:Math.max(min,n);};
 const esc=s=>String(s).replace(/[&<>]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[ch]));
@@ -136,7 +159,7 @@ function lookup(raw){
   return a||null;
 }
 const CACHE="n721ne-fuel-aptcache2";
-let dirIndex=null, dirPromise=null, dirFailed=false, inflight="", activeRaw="", lookupTimer=0;
+let dirIndex=null, dirPromise=null, dirFailed=false;
 const session=new Map();
 function cacheAll(){try{return JSON.parse(localStorage.getItem(CACHE)||"{}")||{};}catch(e){return {};}}
 function cacheGet(raw){
@@ -185,26 +208,25 @@ function foundLine(home){
   const elev=home.elev==null?"elevation not on file":Math.round(home.elev)+" ft";
   return home.id+" · "+home.name+" · "+Number(home.lat).toFixed(4)+", "+Number(home.lon).toFixed(4)+" · "+elev;
 }
-function showFound(home){
-  $("manual").hidden=home.elev!=null;
-  $("unk").hidden=false; $("unk").className="hint";
-  $("unk").textContent=foundLine(home);
-  $("ktusBox").hidden=true; $("priceBox").hidden=false;
+function showFound(field, apt){
+  $(field.manual).hidden=apt.elev!=null;
+  $(field.unk).hidden=false; $(field.unk).className="hint";
+  $(field.unk).textContent=foundLine(apt);
 }
-let lookupGen=0;
-function lookupDir(raw){
-  const gen=++lookupGen;
+function lookupDir(field, raw){
+  const gen=++field.gen;
   loadDir().then(idx=>{
-    if(gen!==lookupGen) return;
+    if(gen!==field.gen) return;
     const rec=idx?idx.get(raw)||null:null;
     session.set(raw, rec);
     if(rec){session.set(rec.id, rec); cachePut(raw, rec);}
-    inflight="";
-    if($("home").value.trim().toUpperCase()===raw || $("home").value.trim().toUpperCase()===(rec&&rec.id)) calc();
+    field.inflight="";
+    const cur=$(field.input).value.trim().toUpperCase();
+    if(cur===raw || cur===(rec&&rec.id)) calc();
   }).catch(()=>{
-    if(gen!==lookupGen) return;
-    session.set(raw, null); inflight="";
-    if($("home").value.trim().toUpperCase()===raw) calc();
+    if(gen!==field.gen) return;
+    session.set(raw, null); field.inflight="";
+    if($(field.input).value.trim().toUpperCase()===raw) calc();
   });
 }
 function track(a,b){
@@ -236,48 +258,79 @@ function ensurePrice(home, alt){
   const v=parseFloat($("basePrice").value);
   return isFinite(v)&&v>0?v:null;
 }
-function buildManual(id){
-  const lat=parseFloat($("manLat").value), lon=parseFloat($("manLon").value), elev=parseFloat($("manElev").value);
+function buildManual(field, id){
+  const lat=parseFloat($(field.lat).value), lon=parseFloat($(field.lon).value), elev=parseFloat($(field.elev).value);
   if(!isFinite(lat)||!isFinite(lon)) return {why:"Enter latitude and longitude to plan from there, or choose a listed airport."};
   if(lat<-90||lat>90||lon<-180||lon>180) return {why:"Latitude must be −90 to 90 and longitude −180 to 180."};
   if(!isFinite(elev)) return {why:"Enter the field elevation (ft MSL) so climb and descent can be computed."};
   return {home:{id, name:"Custom position", elev, lat, lon, price:null, svc:"", src:"Entered coordinates", rwy:"", manual:true}};
 }
-function persist(home){
-  const rec={id:home.id};
-  if(home.manual){
+function persist(field, apt){
+  const rec={id:apt.id};
+  if(apt.manual){
     rec.manual=true;
-    rec.lat=$("manLat").value; rec.lon=$("manLon").value; rec.elev=$("manElev").value;
-    if($("basePrice").value!=="") rec.price=$("basePrice").value;
+    rec.lat=$(field.lat).value; rec.lon=$(field.lon).value; rec.elev=$(field.elev).value;
+    if(field.key==="home" && $("basePrice").value!=="") rec.price=$("basePrice").value;
     if(!dirFailed) rec.miss=true;
-  }else if(home.lookedUp){
-    rec.lookedUp=true; rec.name=home.name; rec.lat=home.lat; rec.lon=home.lon; rec.elev=home.elev;
-    if($("basePrice").value!=="") rec.price=$("basePrice").value;
+  }else if(apt.lookedUp){
+    rec.lookedUp=true; rec.name=apt.name; rec.lat=apt.lat; rec.lon=apt.lon; rec.elev=apt.elev;
+    if(field.key==="home" && $("basePrice").value!=="") rec.price=$("basePrice").value;
   }
-  try{localStorage.setItem(LS, JSON.stringify(rec));}catch(e){}
+  try{localStorage.setItem(field.ls, JSON.stringify(rec));}catch(e){}
 }
-function noteRaw(raw){
-  if(raw===activeRaw) return;
-  activeRaw=raw;
-  $("manLat").value=""; $("manLon").value=""; $("manElev").value="";
-  $("basePrice").value=""; priceKey="";
+function noteRaw(field, raw){
+  if(raw===field.active) return;
+  field.active=raw;
+  $(field.lat).value=""; $(field.lon).value=""; $(field.elev).value="";
+  if(field.key==="home"){$("basePrice").value=""; priceKey="";}
 }
 function clearOut(){$("list").innerHTML="";$("nodet").style.display="none";}
-function paintId(id){
-  $("title").textContent=id+" Fuel Run Planner";
-  document.title=id+" Fuel Run Planner – N721NE";
-  $("endLab").textContent="Fuel wanted landing at "+id+" (gal)";
+function paintLabels(startId, destId){
+  const same=!destId || startId===destId;
+  const title=same?startId+" Fuel Run Planner":startId+" → "+destId+" Fuel Run Planner";
+  $("title").textContent=title;
+  document.title=title+" – N721NE";
+  $("endLab").textContent="Fuel wanted landing at "+(destId||startId)+" (gal)";
+}
+function syncPriceBoxes(home, dest){
+  const startKtus=!!(home && home.id==="KTUS" && !home.manual && !home.lookedUp);
+  const destKtus=!!(dest && dest.id==="KTUS" && !dest.manual && !dest.lookedUp);
+  $("ktusBox").hidden=!(startKtus||destKtus);
+  $("priceBox").hidden=!home || startKtus;
+  $("ktusLab").textContent=startKtus?"KTUS baseline":"KTUS price";
+}
+function quoted(apt, alt){
+  if(!apt || apt.manual) return null;
+  if(apt.id==="KTUS" && !apt.lookedUp){
+    const price=parseFloat($("ktus").value);
+    const text=$("ktus").selectedOptions[0]?$("ktus").selectedOptions[0].textContent:"";
+    return isFinite(price)&&price>0?{price, src:text, svc:"FS"}:null;
+  }
+  if(apt.lookedUp || apt.price==null) return null;
+  return filedPrice(apt, alt);
 }
 $("apts").innerHTML=A.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");
 document.querySelectorAll("#cond button").forEach(b=>b.onclick=()=>{cond=b.dataset.v;document.querySelectorAll("#cond button").forEach(x=>x.classList.toggle("on",x===b));calc();});
-["start","end","ktas","gph","maxnm","ktus","alt","calt","taxi","clrate","clkt","clgph","dsrate","dsgph","basePrice","manLat","manLon","manElev"].forEach(id=>{$(id).addEventListener("input",calc);$(id).addEventListener("change",calc);});
-$("home").addEventListener("input",calc);
-$("home").addEventListener("change",()=>{const a=lookup($("home").value);$("home").value=a?a.id:$("home").value.trim().toUpperCase();calc();});
+["start","end","ktas","gph","maxnm","ktus","alt","calt","taxi","clrate","clkt","clgph","dsrate","dsgph","basePrice","manLat","manLon","manElev","destLat","destLon","destElev"].forEach(id=>{$(id).addEventListener("input",calc);$(id).addEventListener("change",calc);});
+function bindAirport(field){
+  $(field.input).addEventListener("input",calc);
+  $(field.input).addEventListener("change",()=>{const a=lookup($(field.input).value);$(field.input).value=a?a.id:$(field.input).value.trim().toUpperCase();calc();});
+}
+bindAirport(homeF);
+bindAirport(destF);
 $("resetHome").onclick=()=>{
   try{localStorage.removeItem(LS);}catch(e){}
   $("home").value="KTUS";
   $("manLat").value="";$("manLon").value="";$("manElev").value="";$("basePrice").value="";
   priceKey="";
+  homeF.active="";
+  calc();
+};
+$("resetDest").onclick=()=>{
+  try{localStorage.removeItem(LSD);}catch(e){}
+  $("dest").value="KTUS";
+  $("destLat").value="";$("destLon").value="";$("destElev").value="";
+  destF.active="";
   calc();
 };
 function fly(Ed,Ea,D,q){
@@ -295,96 +348,86 @@ function fly(Ed,Ea,D,q){
   const mins=Math.max(0,s.cMin)+cruiseMin+Math.max(0,s.dMin)+TAXI_MIN;
   return {ok:true,fuel,mins,toc:H,capped};
 }
-function calc(){
-  const raw=$("home").value.trim().toUpperCase();
-  const shown=raw||"…";
-  clearTimeout(lookupTimer);
-  paintId(shown);
+function resolve(field){
+  const raw=$(field.input).value.trim().toUpperCase();
   if(raw.length<3){
-    $("unk").hidden=false; $("unk").textContent="Enter an airport identifier, such as KTUS.";
-    $("manual").hidden=true; $("ktusBox").hidden=true; $("priceBox").hidden=true;
-    $("call").className="call"; $("call").textContent="Enter the starting airport.";
-    clearOut(); return;
+    $(field.unk).hidden=false; $(field.unk).className="note";
+    $(field.unk).textContent=field.key==="home"?"Enter an airport identifier, such as KTUS.":"Enter a destination identifier, such as KTUS.";
+    $(field.manual).hidden=true;
+    return {wait:true, call:field.key==="home"?"Enter the starting airport.":"Enter the destination airport.", callClass:"call"};
   }
-  noteRaw(raw);
+  noteRaw(field, raw);
   const known=lookup(raw);
-  let home;
+  let apt;
   if(!known){
     let rec=cacheGet(raw);
     if(!rec && session.has(raw)) rec=session.get(raw);
     if(rec){
-      home=asHome(rec);
-      if($("home").value.trim().toUpperCase()!==home.id){$("home").value=home.id; activeRaw=home.id;}
-      paintId(home.id);
+      apt=asHome(rec);
+      if($(field.input).value.trim().toUpperCase()!==apt.id){$(field.input).value=apt.id; field.active=apt.id;}
       const elevWasMissing=rec.elev==null;
       if(elevWasMissing){
-        if(!$("manLat").value) $("manLat").value=home.lat;
-        if(!$("manLon").value) $("manLon").value=home.lon;
-        const lat=parseFloat($("manLat").value), lon=parseFloat($("manLon").value), elev=parseFloat($("manElev").value);
-        if(isFinite(lat)) home.lat=lat;
-        if(isFinite(lon)) home.lon=lon;
-        if(isFinite(elev)) home.elev=elev;
+        if(!$(field.lat).value) $(field.lat).value=apt.lat;
+        if(!$(field.lon).value) $(field.lon).value=apt.lon;
+        const lat=parseFloat($(field.lat).value), lon=parseFloat($(field.lon).value), elev=parseFloat($(field.elev).value);
+        if(isFinite(lat)) apt.lat=lat;
+        if(isFinite(lon)) apt.lon=lon;
+        if(isFinite(elev)) apt.elev=elev;
       }
-      showFound(home);
-      if(home.elev==null){
-        $("unk").textContent=foundLine(home)+". Enter the field elevation (ft MSL).";
-        $("priceNote").className="note";
-        $("priceNote").textContent="No price is known for "+home.id+". Enter a baseline price to compare with buying fuel there.";
-        $("call").className="call warn"; $("call").textContent=$("unk").textContent;
-        clearOut(); persist(home); return;
+      showFound(field, apt);
+      if(apt.elev==null){
+        $(field.unk).textContent=foundLine(apt)+". Enter the field elevation (ft MSL).";
+        if(field.key==="home"){
+          $("priceNote").className="note";
+          $("priceNote").textContent="No price is known for "+apt.id+". Enter a baseline price to compare with buying fuel there.";
+        }
+        persist(field, apt);
+        return {wait:true, call:$(field.unk).textContent, callClass:"call warn", apt};
       }
-      if(elevWasMissing) cachePut(home.id, Object.assign({}, rec, {lat:home.lat,lon:home.lon,elev:home.elev}));
+      if(elevWasMissing) cachePut(apt.id, Object.assign({}, rec, {lat:apt.lat,lon:apt.lon,elev:apt.elev}));
     }else if(session.has(raw)){
-      $("manual").hidden=false; $("ktusBox").hidden=true; $("priceBox").hidden=false; $("unk").hidden=false; $("unk").className="note";
-      const built=buildManual(raw);
+      $(field.manual).hidden=false;
+      $(field.unk).hidden=false; $(field.unk).className="note";
+      const built=buildManual(field, raw);
       if(!built.home){
         const lead=dirFailed?("The airport directory did not load, so "+raw+" could not be looked up."):(raw+" is not in the airport database.");
-        $("unk").textContent=lead+" "+(built.why||"Enter latitude and longitude to plan from there, or choose a listed airport.");
-        $("priceNote").className="note";
-        $("priceNote").textContent="No price is known for "+raw+". Enter a baseline price if you use these coordinates.";
-        $("call").className="call warn"; $("call").textContent=$("unk").textContent;
-        clearOut();
+        $(field.unk).textContent=lead+" "+(built.why||"Enter latitude and longitude to plan from there, or choose a listed airport.");
+        if(field.key==="home"){
+          $("priceNote").className="note";
+          $("priceNote").textContent="No price is known for "+raw+". Enter a baseline price if you use these coordinates.";
+        }
         const partial={id:raw};
-        if($("manLat").value||$("manLon").value||$("manElev").value||$("basePrice").value!==""){
-          partial.manual=true; partial.lat=$("manLat").value; partial.lon=$("manLon").value; partial.elev=$("manElev").value;
-          if($("basePrice").value!=="") partial.price=$("basePrice").value;
+        const priced=field.key==="home" && $("basePrice").value!=="";
+        if($(field.lat).value||$(field.lon).value||$(field.elev).value||priced){
+          partial.manual=true; partial.lat=$(field.lat).value; partial.lon=$(field.lon).value; partial.elev=$(field.elev).value;
+          if(priced) partial.price=$("basePrice").value;
         }
         if(!dirFailed) partial.miss=true;
-        try{localStorage.setItem(LS, JSON.stringify(partial));}catch(e){}
-        return;
+        try{localStorage.setItem(field.ls, JSON.stringify(partial));}catch(e){}
+        return {wait:true, call:$(field.unk).textContent, callClass:"call warn", showPrice:field.key==="home"};
       }
-      home=built.home;
-      $("unk").textContent=raw+" is not in the airport database. Using the coordinates you entered.";
+      apt=built.home;
+      $(field.unk).textContent=raw+" is not in the airport database. Using the coordinates you entered.";
     }else{
-      $("unk").hidden=false; $("unk").className="hint";
-      $("unk").textContent="Looking up "+raw+"…";
-      $("manual").hidden=true; $("ktusBox").hidden=true; $("priceBox").hidden=true;
-      $("call").className="call"; $("call").textContent=$("unk").textContent;
-      clearOut();
-      lookupTimer=setTimeout(()=>{
-        if($("home").value.trim().toUpperCase()!==raw) return;
-        try{localStorage.setItem(LS, JSON.stringify({id:raw}));}catch(e){}
-        if(inflight!==raw){inflight=raw; lookupDir(raw);}
+      $(field.unk).hidden=false; $(field.unk).className="hint";
+      $(field.unk).textContent="Looking up "+raw+"…";
+      $(field.manual).hidden=true;
+      field.timer=setTimeout(()=>{
+        if($(field.input).value.trim().toUpperCase()!==raw) return;
+        try{localStorage.setItem(field.ls, JSON.stringify({id:raw}));}catch(e){}
+        if(field.inflight!==raw){field.inflight=raw; lookupDir(field, raw);}
       }, 250);
-      return;
+      return {wait:true, call:"Looking up "+raw+"…", callClass:"call"};
     }
   }else{
-    home=known;
-    $("manual").hidden=true; $("unk").hidden=true; $("unk").textContent="";
-    $("ktusBox").hidden=home.id!=="KTUS";
-    $("priceBox").hidden=home.id==="KTUS";
-    if(home.id!==raw){$("home").value=home.id; activeRaw=home.id; paintId(home.id);}
+    apt=known;
+    $(field.manual).hidden=true; $(field.unk).hidden=true; $(field.unk).textContent="";
+    if(apt.id!==raw){$(field.input).value=apt.id; field.active=apt.id;}
   }
-  persist(home);
-  const clamp=v=>Math.max(0,Math.min(CAP,parseFloat(v)||0));
-  const s=clamp($("start").value), e=clamp($("end").value);
-  const q={
-    alt:num("calt",9000,0), tas:num("ktas",200,1), cruiseGph:num("gph",10.5,0.1),
-    taxi:num("taxi",0.5,0), climbFpm:num("clrate",1000,1), climbKt:num("clkt",130,1),
-    climbGph:num("clgph",14,0), descFpm:num("dsrate",500,1), descGph:num("dsgph",7,0)
-  };
-  const maxNm=num("maxnm",100,0), alt=$("alt").checked;
-  const res=(cond==="day"?0.5:0.75)*q.cruiseGph;
+  persist(field, apt);
+  return {wait:false, apt};
+}
+function planSame(home, s, e, q, maxNm, alt, res){
   const need=e-s;
   if(need<=0||e<res){
     $("call").className="call warn";
@@ -448,38 +491,188 @@ function calc(){
   $("nodet").style.display=no.length?"block":"none";
   $("no").innerHTML=no.map(n=>'<div class="card"><div class="row1"><span>'+esc(n.a.id)+' '+esc(n.a.name)+'</span><span>'+n.nm.toFixed(1)+' NM</span></div><div class="row2">'+esc(n.why)+'</div></div>').join("");
 }
-try{
-  const rec=JSON.parse(localStorage.getItem(LS)||"null");
-  if(rec&&rec.id){
-    const id=String(rec.id).toUpperCase();
-    $("home").value=id;
-    activeRaw=id;
-    if(rec.lookedUp && rec.lat!=null && rec.lon!=null && rec.lat!=="" && rec.lon!==""){
-      const found={id,name:rec.name||id,lat:+rec.lat,lon:+rec.lon,elev:rec.elev==null||rec.elev===""?null:+rec.elev,local:""};
-      session.set(id, found);
-      cachePut(id, found);
-      // Older saves used a K prefix OurAirports invents for FAA codes that contain a digit (KE63). Confirm the real id.
-      if(/^K[A-Z0-9]{3}$/.test(id) && /\d/.test(id)){
-        loadDir().then(idx=>{
-          const real=idx&&idx.get(id);
-          if(!real || real.id===id) return;
-          session.set(id, real); session.set(real.id, real); cachePut(id, real);
-          const cur=$("home").value.trim().toUpperCase();
-          if(cur===id || cur===real.id) calc();
-        }).catch(()=>{});
-      }
-    }else if(rec.miss || rec.manual){
-      if(rec.lat!=null && rec.lat!=="") $("manLat").value=rec.lat;
-      if(rec.lon!=null && rec.lon!=="") $("manLon").value=rec.lon;
-      if(rec.elev!=null && rec.elev!=="") $("manElev").value=rec.elev;
-      if(rec.miss) session.set(id, null);
-    }
-    if(rec.price!=null && rec.price!==""){
-      $("basePrice").value=rec.price;
-      priceKey=rec.lookedUp?id+"|L":"manual";
+function planTrip(home, dest, s, e, q, maxNm, alt, res){
+  const isKtus=home.id==="KTUS"&&!home.manual;
+  const k=isKtus?parseFloat($("ktus").value):ensurePrice(home, alt);
+  if(!isKtus){
+    const f=filedPrice(home, alt);
+    if(!f){
+      $("priceNote").className="note";
+      $("priceNote").textContent="No price is known for "+home.id+". Enter a baseline price to compare with buying fuel there.";
+    }else{
+      $("priceNote").className="hint";
+      $("priceNote").textContent="On file: "+m(f.price)+(f.svc?" "+f.svc:"")+(f.src?" · "+f.src:"")+". You can edit this.";
     }
   }
-}catch(e){}
+  if(e<res){
+    $("call").className="call warn";
+    $("call").textContent="Ending fuel must be at least the "+cond+" reserve of "+res.toFixed(2)+" gal.";
+    clearOut(); return;
+  }
+  const direct=track(home, dest);
+  const directLeg=fly(home.elev, dest.elev, direct.nm, q);
+  const directOk=!!directLeg.ok;
+  const directFuel=directOk?directLeg.fuel:0;
+  const depart=e+directFuel, buyBase=depart-s;
+  const gained=e-(s-directFuel);
+  const baselineOk=directOk && depart<=CAP && buyBase>0 && k!=null;
+  const base=baselineOk?buyBase*k:null;
+  if(directOk && depart<=CAP && buyBase<=0){
+    $("call").className="call warn";
+    $("call").textContent="You already have enough fuel to land at "+dest.id+" with "+e.toFixed(1)+" gal after the direct flight, so there's nothing to buy.";
+    clearOut(); return;
+  }
+  const ok=[], no=[];
+  for(const a of A){
+    if(a.id===home.id || a.id===dest.id) continue;
+    const go=track(home,a), ret=track(a,dest);
+    if(go.nm<0.5){no.push({a,nm:go.nm,why:"Same location as the starting airport."});continue;}
+    if(ret.nm<0.5){no.push({a,nm:ret.nm,why:"Same location as the destination."});continue;}
+    if(go.nm>maxNm && ret.nm>maxNm){no.push({a,nm:go.nm,why:"beyond max distance"});continue;}
+    const price=alt&&a.altPrice?a.altPrice:a.price, src=alt&&a.altPrice?(a.altSrc||a.src):a.src;
+    const out=fly(home.elev,a.elev,go.nm,q), back=fly(a.elev,dest.elev,ret.nm,q);
+    if(!out.ok||!back.ok){no.push({a,nm:go.nm,why:"Not enough distance to climb and descend between these elevations."});continue;}
+    if(s-out.fuel<res){no.push({a,nm:go.nm,why:"Outbound leg would land below reserve."});continue;}
+    if(e+back.fuel>CAP){no.push({a,nm:go.nm,why:"Can land at "+dest.id+" with at most "+(CAP-back.fuel).toFixed(1)+" gal from here."});continue;}
+    const buy=e+out.fuel+back.fuel-s, cost=buy*price, save=base==null?null:base-cost;
+    const eff=directOk&&gained>0?cost/gained:null;
+    ok.push({a,price,src,buy,cost,save,out,back,go,ret,eff,arrival:false});
+  }
+  const dq=quoted(dest, alt);
+  if(dq && directOk){
+    if(s-directFuel<res){
+      no.push({a:dest,nm:direct.nm,why:"Arrival would land below reserve, so buying on arrival needs fuel before departure."});
+    }else if(e<=CAP){
+      const buy=e+directFuel-s, cost=buy*dq.price, save=base==null?null:base-cost;
+      const eff=gained>0?cost/gained:null;
+      ok.push({a:dest,price:dq.price,src:dq.src,buy,cost,save,out:directLeg,back:{fuel:0,mins:0,toc:dest.elev,capped:false},go:direct,ret:{nm:0,brg:0},eff,arrival:true});
+    }
+  }
+  ok.sort((x,y)=>x.cost-y.cost);
+  const b=ok[0], sid=esc(home.id), did=esc(dest.id);
+  const bestName=b?(b.arrival?"buy on arrival at "+esc(b.a.id)+" "+esc(b.a.name):esc(b.a.id)+" "+esc(b.a.name)):"";
+  if(k==null){
+    $("call").className="call warn";
+    $("call").textContent=home.id+" has no price on file. Enter a baseline price to compare a fuel stop with fueling there.";
+  }else if(!baselineOk){
+    if(b){
+      $("call").className="call good";
+      $("call").innerHTML="<b>Best stop: "+bestName+".</b> "+m(b.cost)+" for "+b.buy.toFixed(1)+" gal"+(b.eff!=null?", "+m(b.eff)+"/gal delivered":"")+", about "+Math.round(b.out.mins+b.back.mins)+" min of flying. The direct flight cannot land with "+e.toFixed(1)+" gal inside the 50-gallon tank.";
+    }else{
+      $("call").className="call warn";
+      $("call").textContent="No fuel stop can land at "+dest.id+" with "+e.toFixed(1)+" gal, and the direct flight cannot either.";
+    }
+  }else if(b&&b.save>0){
+    $("call").className="call good";
+    $("call").innerHTML="<b>Best stop: "+bestName+".</b> "+m(b.cost)+" for "+b.buy.toFixed(1)+" gal, "+m(b.eff)+"/gal delivered, saving "+m(b.save)+" over fueling at "+sid+" and flying direct to "+did+" ("+m(base)+"), about "+Math.round(b.out.mins+b.back.mins)+" min of flying.";
+  }else{
+    $("call").className="call";
+    $("call").innerHTML="<b>Fuel at "+sid+" and fly direct to "+did+".</b> "+buyBase.toFixed(1)+" gal costs "+m(base)+", and no fuel stop beats that.";
+  }
+  const homeSvc=isKtus?"FS":(home.svc||"");
+  let h;
+  if(k==null){
+    h='<div class="card"><div class="row1"><span>'+sid+' – baseline price needed</span></div><div class="row2">Enter a price to compare fueling here, then flying direct to '+did+', with a fuel stop.</div></div>';
+  }else if(!directOk){
+    h='<div class="card"><div class="row1"><span>'+sid+' → '+did+'</span></div><div class="row2">Not enough distance to climb and descend on the direct flight.</div></div>';
+  }else if(depart>CAP){
+    h='<div class="card"><div class="row1"><span>'+sid+' → '+did+' · '+direct.nm.toFixed(1)+' NM</span></div><div class="row2">Landing with '+e.toFixed(1)+' gal would mean leaving with '+depart.toFixed(1)+' gal, above the 50-gallon tank.</div></div>';
+  }else{
+    h='<div class="card"><div class="row1"><span>'+sid+' – fuel at start, fly direct to '+did+'</span><span>'+m(base)+'</span></div>'+
+      '<div class="row2">'+m(k)+(homeSvc?" "+homeSvc:"")+' · buy '+buyBase.toFixed(1)+' gal · '+direct.nm.toFixed(1)+' NM · '+deg(direct.brg)+' true · land with '+e.toFixed(1)+' gal · '+m(k)+'/gal delivered</div></div>';
+  }
+  for(const r of ok){
+    const cls=r.save!=null&&r.save>0?"good":"bad";
+    const cmp=r.save==null?"":'<span class="'+cls+'">'+(r.save>=0?"saves "+m(r.save):"costs "+m(-r.save)+" more")+'</span> · ';
+    const eff=r.eff!=null?m(r.eff)+"/gal delivered · ":"";
+    const title=esc(r.a.id)+" "+esc(r.a.name)+(r.arrival?" · buy on arrival":"");
+    if(r.arrival){
+      const toc=r.out.capped?" · TOC capped "+Math.round(r.out.toc)+" ft":"";
+      h+='<div class="card"><div class="row1"><span>'+title+'</span><span>'+m(r.cost)+'</span></div>'+
+        '<div class="row2">'+cmp+eff+'buy '+r.buy.toFixed(1)+' gal @ '+m(r.price)+' '+(r.a.svc||'')+'</div>'+
+        '<div class="row2">'+esc(home.id)+'→'+esc(dest.id)+' '+r.go.nm.toFixed(1)+' NM · '+r.out.fuel.toFixed(1)+' gal · '+Math.round(r.out.mins)+' min · '+deg(r.go.brg)+' true'+toc+'</div>'+
+        '<div class="row2">'+esc(r.src||'')+(r.a.rwy?' · rwy '+esc(r.a.rwy):'')+(r.a.note?' · '+esc(r.a.note):'')+'</div></div>';
+    }else{
+      const toc=[];
+      if(r.out.capped) toc.push(Math.round(r.out.toc)+" ft to the stop");
+      if(r.back.capped) toc.push(Math.round(r.back.toc)+" ft to "+dest.id);
+      h+='<div class="card"><div class="row1"><span>'+title+'</span><span>'+m(r.cost)+'</span></div>'+
+        '<div class="row2">'+cmp+eff+'buy '+r.buy.toFixed(1)+' gal @ '+m(r.price)+' '+(r.a.svc||'')+' · '+Math.round(r.out.mins+r.back.mins)+' min</div>'+
+        '<div class="row2">'+esc(home.id)+'→'+esc(r.a.id)+' '+r.go.nm.toFixed(1)+' NM · '+r.out.fuel.toFixed(1)+' gal · '+Math.round(r.out.mins)+' min · '+deg(r.go.brg)+' true</div>'+
+        '<div class="row2">'+esc(r.a.id)+'→'+esc(dest.id)+' '+r.ret.nm.toFixed(1)+' NM · '+r.back.fuel.toFixed(1)+' gal · '+Math.round(r.back.mins)+' min · '+deg(r.ret.brg)+' true'+(toc.length?' · TOC capped '+toc.join(' / '):'')+'</div>'+
+        '<div class="row2">'+esc(r.src||'')+(r.a.rwy?' · rwy '+esc(r.a.rwy):'')+(r.a.note?' · '+esc(r.a.note):'')+'</div></div>';
+    }
+  }
+  $("list").innerHTML=h;
+  $("nodet").style.display=no.length?"block":"none";
+  $("no").innerHTML=no.map(n=>'<div class="card"><div class="row1"><span>'+esc(n.a.id)+' '+esc(n.a.name)+'</span><span>'+n.nm.toFixed(1)+' NM</span></div><div class="row2">'+esc(n.why)+'</div></div>').join("");
+}
+function calc(){
+  clearTimeout(homeF.timer);
+  clearTimeout(destF.timer);
+  const home=resolve(homeF);
+  const dest=resolve(destF);
+  const hs=home.apt?home.apt.id:($(homeF.input).value.trim().toUpperCase()||"…");
+  const dsRaw=$(destF.input).value.trim().toUpperCase();
+  const ds=dest.apt?dest.apt.id:(dsRaw||hs);
+  paintLabels(hs, ds);
+  if(home.showPrice){$("ktusBox").hidden=true; $("priceBox").hidden=false;}
+  else if(home.apt) syncPriceBoxes(home.apt, dest.apt||null);
+  else {$("ktusBox").hidden=true; $("priceBox").hidden=true;}
+  if(home.wait||dest.wait){
+    const who=home.wait?home:dest;
+    $("call").className=who.callClass||"call";
+    $("call").textContent=who.call||"";
+    clearOut();
+    return;
+  }
+  const clamp=v=>Math.max(0,Math.min(CAP,parseFloat(v)||0));
+  const s=clamp($("start").value), e=clamp($("end").value);
+  const q={
+    alt:num("calt",9000,0), tas:num("ktas",200,1), cruiseGph:num("gph",10.5,0.1),
+    taxi:num("taxi",0.5,0), climbFpm:num("clrate",1000,1), climbKt:num("clkt",130,1),
+    climbGph:num("clgph",14,0), descFpm:num("dsrate",500,1), descGph:num("dsgph",7,0)
+  };
+  const maxNm=num("maxnm",100,0), alt=$("alt").checked;
+  const res=(cond==="day"?0.5:0.75)*q.cruiseGph;
+  paintLabels(home.apt.id, dest.apt.id);
+  syncPriceBoxes(home.apt, dest.apt);
+  if(home.apt.id===dest.apt.id) planSame(home.apt, s, e, q, maxNm, alt, res);
+  else planTrip(home.apt, dest.apt, s, e, q, maxNm, alt, res);
+}
+function restoreField(field){
+  let rec=null;
+  try{rec=JSON.parse(localStorage.getItem(field.ls)||"null");}catch(e){return;}
+  if(!rec||!rec.id) return;
+  let id=String(rec.id).toUpperCase();
+  $(field.input).value=id;
+  field.active=id;
+  if(rec.lookedUp && rec.lat!=null && rec.lon!=null && rec.lat!=="" && rec.lon!==""){
+    const found={id,name:rec.name||id,lat:+rec.lat,lon:+rec.lon,elev:rec.elev==null||rec.elev===""?null:+rec.elev,local:""};
+    session.set(id, found);
+    cachePut(id, found);
+    if(/^K[A-Z0-9]{3}$/.test(id) && /\d/.test(id)){
+      loadDir().then(idx=>{
+        const real=idx&&idx.get(id);
+        if(!real || real.id===id) return;
+        session.set(id, real); session.set(real.id, real); cachePut(id, real);
+        const cur=$(field.input).value.trim().toUpperCase();
+        if(cur===id || cur===real.id) calc();
+      }).catch(()=>{});
+    }
+  }else if(rec.miss || rec.manual){
+    if(rec.lat!=null && rec.lat!=="") $(field.lat).value=rec.lat;
+    if(rec.lon!=null && rec.lon!=="") $(field.lon).value=rec.lon;
+    if(rec.elev!=null && rec.elev!=="") $(field.elev).value=rec.elev;
+    if(rec.miss) session.set(id, null);
+  }
+  if(field.key==="home" && rec.price!=null && rec.price!==""){
+    $("basePrice").value=rec.price;
+    priceKey=rec.lookedUp?id+"|L":"manual";
+  }
+}
+restoreField(homeF);
+restoreField(destF);
 calc();
 </script>
 </body>
